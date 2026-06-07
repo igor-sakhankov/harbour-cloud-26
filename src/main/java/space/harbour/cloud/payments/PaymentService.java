@@ -34,6 +34,9 @@ public class PaymentService {
 	 *         replayed from a previous identical request.
 	 */
 	public RegistrationResult register(String storeId, String idempotencyKey, PaymentRequest request) {
+		String effectiveKey = (idempotencyKey != null && !idempotencyKey.isBlank())
+				? idempotencyKey
+				: UUID.randomUUID().toString();
 		Payment candidate = new Payment(
 				UUID.randomUUID().toString(),
 				storeId,
@@ -41,7 +44,7 @@ public class PaymentService {
 				request.price(),
 				request.currency(),
 				request.loyaltyCardId(),
-				idempotencyKey,
+				effectiveKey,
 				clock.instant()
 		);
 

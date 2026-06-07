@@ -47,7 +47,7 @@ public class PaymentController {
 	@PostMapping
 	public ResponseEntity<PaymentResponse> registerPayment(
 			@RequestHeader(STORE_ID_HEADER) @NotBlank(message = "Store-Id header is required") String storeId,
-			@RequestHeader(IDEMPOTENCY_KEY_HEADER) @NotBlank(message = "Idempotency-Key header is required") String idempotencyKey,
+			@RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
 			@Valid @RequestBody PaymentRequest request) {
 
 		PaymentService.RegistrationResult result =

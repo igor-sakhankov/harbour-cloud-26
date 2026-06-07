@@ -82,6 +82,29 @@ class PaymentControllerTest {
 	}
 
 	@Test
+	void missingIdempotencyKeyCreatesNewPaymentEachTime() throws Exception {
+		MockMvc mvc = mockMvc();
+
+		String first = mvc.perform(post("/api/v1/payments")
+						.header(PaymentController.STORE_ID_HEADER, "store-no-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(VALID_BODY))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+
+		String second = mvc.perform(post("/api/v1/payments")
+						.header(PaymentController.STORE_ID_HEADER, "store-no-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(VALID_BODY))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+
+		String firstId = com.jayway.jsonpath.JsonPath.read(first, "$.paymentId");
+		String secondId = com.jayway.jsonpath.JsonPath.read(second, "$.paymentId");
+		org.junit.jupiter.api.Assertions.assertNotEquals(firstId, secondId);
+	}
+
+	@Test
 	void invalidCurrencyIsRejected() throws Exception {
 		String badBody = VALID_BODY.replace("\"EUR\"", "\"euro\"");
 		mockMvc().perform(post("/api/v1/payments")
