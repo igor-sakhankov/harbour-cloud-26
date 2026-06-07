@@ -1,1 +1,16 @@
-services: {}
+services:
+  payment-processor:
+    image: wiremock/wiremock:latest
+    ports:
+      - "9090:8080"
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:latest
+    ports:
+      - "8474:8474"   # Toxiproxy REST API — add/remove toxics here
+      - "9091:9091"   # Proxy port — app connects here instead of payment-processor directly
+    volumes:
+      - ./toxiproxy.json:/toxiproxy.json
+    command: ["-config", "/toxiproxy.json", "-host", "0.0.0.0"]
+    depends_on:
+      - payment-processor
