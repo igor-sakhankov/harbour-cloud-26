@@ -46,6 +46,20 @@ GET /api/v1/payments?storeId=<store-id>
 GET /api/v1/payments/{paymentId}
 ```
 
+#### Batch import payments from CSV
+```
+POST /api/v1/payments/import
+Content-Type: multipart/form-data
+
+file: <CSV file>
+```
+
+Accepts a CSV file with columns: `storeId,coffeeType,price,currency,loyaltyCardId,idempotencyKey`
+
+Returns `200 OK` with detailed import summary including per-row error details.
+
+**See [CSV Import Guide](./docs/CSV_IMPORT.md) for full documentation.**
+
 ### Coffee types
 `ESPRESSO` · `DOUBLE_ESPRESSO` · `AMERICANO` · `LATTE` · `CAPPUCCINO` · `FLAT_WHITE` · `MOCHA` · `CORTADO` · `MACCHIATO` · `COLD_BREW`
 
@@ -147,13 +161,20 @@ harbour-cloud-26/
 │   │   │       ├── PaymentService.java        # Idempotency logic
 │   │   │       ├── PaymentRepository.java     # In-memory store
 │   │   │       ├── PaymentConfig.java         # Clock bean
-│   │   │       └── PaymentExceptionHandler.java # 400 error shaping
+│   │   │       ├── PaymentExceptionHandler.java # 400 error shaping
+│   │   │       ├── CsvPaymentRecord.java      # CSV row DTO
+│   │   │       ├── CsvImportResult.java       # CSV import result DTO
+│   │   │       ├── CsvPaymentImportService.java # CSV processor (parser, validator, sender)
+│   │   │       ├── CsvImportController.java   # CSV import endpoint
+│   │   │       └── RestTemplateConfig.java    # REST client config
 │   │   └── resources/
 │   │       ├── application.properties
 │   │       └── static/index.html             # Transaction viewer UI
 │   └── test/
 │       └── java/space/harbour/cloud/payments/
 │           └── PaymentControllerTest.java
+├── docs/
+│   └── CSV_IMPORT.md                          # CSV import documentation
 ├── compose.yaml          # Toxiproxy sidecar
 ├── toxiproxy.json        # Proxy config: 9091 → localhost:8080
 ├── build.gradle.kts
