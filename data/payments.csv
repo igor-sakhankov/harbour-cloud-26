@@ -1,0 +1,4 @@
+storeId,idempotencyKey,coffeeType,price,currency,loyaltyCardId
+store-london-01,order-001,LATTE,3.50,EUR,card-101
+store-london-01,order-002,ESPRESSO,2.20,EUR,card-102
+store-london-01,order-003,CAPPUCCINO,3.80,EUR,card-103
