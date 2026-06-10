@@ -1,0 +1,6 @@
+storeId,idempotencyKey,coffeeType,price,currency,loyaltyCardId
+store-london-01,2026-06-10-0001,LATTE,3.50,EUR,card-999
+store-london-01,2026-06-10-0002,ESPRESSO,2.00,EUR,card-111
+store-london-01,2026-06-10-0003,FLAT_WHITE,3.20,EUR,card-123
+store-london-01,2026-06-10-0004,COLD_BREW,4.00,EUR,card-222
+store-london-01,2026-06-10-0005,CAPPUCCINO,3.10,EUR,card-456

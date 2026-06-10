@@ -19,3 +19,4 @@ out/
 # Spring Boot
 *.log
 spring-shell.log
+import-journal.txt

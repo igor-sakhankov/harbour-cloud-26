@@ -165,3 +165,87 @@ harbour-cloud-26/
 ## Course context
 
 This repository is the practical companion to the **Distributed Systems & Cloud** lecture series. The storage layer is intentionally in-memory (a `ConcurrentHashMap`) — later modules swap it for a real database, add messaging via Kafka, and deploy to AWS. Each change targets a single distributed-systems concept so students can study it in isolation.
+
+
+## CSV payment importer
+
+End-of-day automation for store owners: read a notebook of payments from a CSV
+file and **reliably** propagate every row to the Payments API ("the Central
+System"), surviving network faults without ever creating a duplicate payment.
+
+Lives in `space.harbour.cloud.importer.PaymentCsvImporter`. It is a plain HTTP
+client (`java.net.http.HttpClient`) — no Spring context required — so it can run
+standalone against a local app or any deployed instance.
+
+### CSV format
+
+Header is order-independent. `idempotencyKey` and `loyaltyCardId` may be blank
+(but note the API rejects a blank `loyaltyCardId` with 400 in the current build).
+
+```csv
+storeId,idempotencyKey,coffeeType,price,currency,loyaltyCardId
+store-london-01,2026-06-10-0001,LATTE,3.50,EUR,card-999
+store-london-01,2026-06-10-0002,ESPRESSO,2.00,EUR,card-111
+```
+
+| Column           | Required | Notes                                                        |
+|------------------|----------|--------------------------------------------------------------|
+| `storeId`        | yes      | Sent as the `Store-Id` header.                               |
+| `idempotencyKey` | no       | Natural "notebook entry id". If blank, a stable key is derived from the row content + position, so re-running the same file stays idempotent. |
+| `coffeeType`     | yes      | One of the `CoffeeType` enum values.                         |
+| `price`          | yes      | Numeric; emitted to JSON verbatim.                           |
+| `currency`       | yes      | ISO-4217.                                                    |
+| `loyaltyCardId`  | no       | Omitted from the request body when blank.                    |
+
+### Running
+
+```bash
+# against the app directly
+./gradlew importCsv --args="samples/payments-sample.csv http://localhost:8080"
+
+# through Toxiproxy, to exercise fault tolerance
+./gradlew importCsv --args="samples/payments-sample.csv http://localhost:9091"
+```
+
+Output reports per-row outcome and a final tally:
+
+```
+done: created=5 alreadyExisted=0 skipped=0 failed=0
+```
+
+Exit code is `0` only when nothing was left undelivered.
+
+### How "reliably" is achieved
+
+Three independent layers:
+
+1. **Idempotency** — every row carries a stable `Idempotency-Key`. The server
+   dedupes on `(Store-Id x Idempotency-Key)` and replays the original payment
+   with `200` on a repeat, so a retried POST never creates a duplicate.
+2. **Retries with capped exponential backoff + full jitter** — transient
+   failures (connection drops, timeouts, `408`/`429`/`5xx`) are retried;
+   `Retry-After` is honoured on `429`. Permanent failures (`400`/`422`
+   validation, `401`/`403`/`404`) are **not** retried — retrying bad data is
+   pointless, so the row is logged and skipped.
+3. **A resumable journal** — confirmed keys are appended to `import-journal.txt`;
+   a re-run skips already-confirmed rows. The journal is an optimisation and
+   audit trail — the real exactly-once guarantee comes from server-side
+   idempotency, not the journal.
+
+### Verifying it (with Toxiproxy)
+
+- **Idempotent replay** — run the importer twice; the second run reports
+  `alreadyExisted` / `skipped` and `GET /api/v1/payments?storeId=...` still
+  returns the original count, never doubled.
+- **Retry under faults** — inject latency or a timeout toxic on port `9091`,
+  then import through the proxy. The log shows repeated `attempt N` entries; the
+  payment count never grows beyond the number of CSV rows.
+- **No duplicates even when everything fails** — under a permanent timeout
+  toxic, every row exhausts its retries and the importer exits non-zero, yet the
+  store still holds exactly one payment per already-created row — proof that
+  retries are duplicate-safe.
+
+Automated equivalents of these scenarios run without Docker in
+`PaymentCsvImporterTest` (a self-contained fake server that fails twice then
+succeeds), covering retry-then-create, journal-based skip, and server-side
+idempotent replay.
