@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+sent_orders.json
+.pytest_cache/
