@@ -28,3 +28,10 @@ dependencies {
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("importCsv") {
+    group = "application"
+    mainClass.set("space.harbour.cloud.importer.PaymentCsvImporter")
+    classpath = sourceSets["main"].runtimeClasspath
+    // ./gradlew importCsv --args="samples/payments-sample.csv http://localhost:9091"
+}
