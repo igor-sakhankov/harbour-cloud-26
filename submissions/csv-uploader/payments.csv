@@ -1,0 +1,9 @@
+order_id,coffee_type,price,currency,loyalty_card_id
+order-001,LATTE,3.50,EUR,card-001
+order-002,ESPRESSO,2.00,EUR,card-002
+order-003,CAPPUCCINO,3.20,EUR,card-003
+order-004,FLAT_WHITE,3.50,EUR,card-004
+order-005,MOCHA,4.00,EUR,card-005
+order-006,AMERICANO,2.50,EUR,card-006
+order-007,COLD_BREW,4.50,EUR,card-007
+order-008,DOUBLE_ESPRESSO,2.80,EUR,card-008
