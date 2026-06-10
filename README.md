@@ -46,6 +46,44 @@ GET /api/v1/payments?storeId=<store-id>
 GET /api/v1/payments/{paymentId}
 ```
 
+### Payment CSV importer
+
+The importer accepts a notebook CSV export and sends each row to the Central System using the same idempotent Payments API.
+
+```
+POST /api/v1/payment-imports
+Content-Type: multipart/form-data
+file=@payments.csv
+```
+
+CSV columns:
+
+```
+storeId,idempotencyKey,coffeeType,price,currency,loyaltyCardId
+store-london-01,sale-001,LATTE,3.50,EUR,card-123
+```
+
+`idempotencyKey` is optional. When it is blank or omitted, the importer derives a stable key from the row number and content, so retrying the same file does not duplicate payments.
+
+The response is a summary:
+
+```json
+{
+  "totalRows": 2,
+  "created": 1,
+  "replayed": 1,
+  "failed": 0,
+  "failures": []
+}
+```
+
+By default the importer sends requests to `http://localhost:9091` and retries transient Central System failures up to 3 attempts. Override with:
+
+```properties
+payment-importer.central-system-base-url=http://central-system.example
+payment-importer.max-attempts=3
+```
+
 ### Coffee types
 `ESPRESSO` · `DOUBLE_ESPRESSO` · `AMERICANO` · `LATTE` · `CAPPUCCINO` · `FLAT_WHITE` · `MOCHA` · `CORTADO` · `MACCHIATO` · `COLD_BREW`
 
@@ -81,7 +119,14 @@ The app is now reachable on two ports:
 
 Open the transaction viewer UI at **http://localhost:8080** (or **http://localhost:9091** to route through the proxy).
 
-### 2. Run tests
+### 2. Import a CSV file
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/payment-imports \
+  -F file=@payments.csv
+```
+
+### 3. Run tests
 
 ```bash
 ./gradlew test
@@ -138,6 +183,7 @@ harbour-cloud-26/
 │   ├── main/
 │   │   ├── java/space/harbour/cloud/
 │   │   │   ├── CloudApplication.java          # Spring Boot entry point
+│   │   │   ├── importer/                      # CSV import endpoint, parser, Central System client
 │   │   │   └── payments/
 │   │   │       ├── Payment.java               # Domain record
 │   │   │       ├── PaymentRequest.java        # Validated request body
