@@ -2,8 +2,11 @@ package space.harbour.cloud.payments;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
+import java.time.Duration;
 
 @Configuration
 public class PaymentConfig {
@@ -15,5 +18,17 @@ public class PaymentConfig {
 	@Bean
 	public Clock clock() {
 		return Clock.systemUTC();
+	}
+
+	/**
+	 * Configures a default RestClient.Builder bean with client timeouts
+	 * to prevent requests from hanging indefinitely.
+	 */
+	@Bean
+	public RestClient.Builder restClientBuilder() {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		factory.setConnectTimeout(Duration.ofSeconds(2));
+		factory.setReadTimeout(Duration.ofSeconds(2));
+		return RestClient.builder().requestFactory(factory);
 	}
 }
