@@ -27,23 +27,24 @@ int main(int argc, char **argv) {
 
     for (size_t i = 0; i < payments.size(); ++i) {
         const Payment &p = payments[i];
-        SendResult res = sendPayment(baseUrl, p);
+        SendResult res = sendWithRetry(baseUrl, p);
 
         if (!res.responded) {
             ++failed;
-            std::cout << "FAILED    " << p.transactionId << " -> " << res.error << "\n ";
+            std::cout << "FAILED " << p.transactionId << " -> " << res.error << "\n ";
         } else if (res.status == 201) {
             ++created;
-            std::cout << "CREATED   " << p.transactionId << "\n";
+            std::cout << "CREATED " << p.transactionId << "\n";
         } else if (res.status == 200) {
             ++duplicate;
             std::cout << "DUPLICATE " << p.transactionId << "\n";
         } else {
             ++rejected;
-            std::cout << "REJECTED  " << p.transactionId << " -> HTTP " << res.status << "\n";
+            std::cout << "REJECTED " << p.transactionId << " -> HTTP " << res.status << "\n";
         }
     }
 
-    std::cout << "\nSummary: created=" << created << " duplicate=" << duplicate << " rejected=" << rejected << " failed=" << failed << "\n";
+    std::cout << "\nSummary: created=" << created << " duplicate=" << duplicate
+              << " rejected=" << rejected << " failed=" << failed << "\n";
     return 0;
 }
