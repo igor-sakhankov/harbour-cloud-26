@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    SendResult res = sendPayment("http://127.0.0.1:8090", payments[0]);
+    SendResult res = sendPayment("http://127.0.0.1:8080", payments[0]);
     if (res.responded) {
         std::cout << "sent payment 0 -> HTTP " << res.status << "\n";
     } else {

@@ -31,3 +31,4 @@ target_link_libraries(client PUBLIC httplib::httplib nlohmann_json::nlohmann_jso
 
 add_executable(app src/main.cpp)
 target_link_libraries(app PRIVATE parser)
+target_link_libraries(app PRIVATE client)

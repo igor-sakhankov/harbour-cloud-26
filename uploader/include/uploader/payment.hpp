@@ -1,4 +1,5 @@
 // storeId, transactionId,coffeeType,price,currency,loyaltyCardId
+#pragma once
 #include <optional>
 #include <string>
 
