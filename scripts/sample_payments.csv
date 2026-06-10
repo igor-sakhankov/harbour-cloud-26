@@ -1,0 +1,12 @@
+store_id,transaction_id,coffee_type,price,currency,loyalty_card_id
+store-alpha,txn-001,LATTE,3.50,EUR,card-abc123
+store-alpha,txn-002,ESPRESSO,2.00,EUR,
+store-beta,txn-003,CAPPUCCINO,3.75,EUR,card-xyz789
+store-beta,,AMERICANO,2.50,EUR,card-def456
+store-alpha,txn-005,FLAT_WHITE,4.00,GBP,
+store-gamma,txn-006,COLD_BREW,4.50,EUR,card-ghi012
+store-gamma,txn-007,MOCHA,3.80,EUR,
+store-beta,txn-008,CORTADO,3.20,EUR,card-jkl345
+store-alpha,,DOUBLE_ESPRESSO,2.80,EUR,
+store-gamma,txn-010,MACCHIATO,3.10,EUR,card-mno678
+store-delta,txn-bad,INVALID_COFFEE,2.00,EUR,
