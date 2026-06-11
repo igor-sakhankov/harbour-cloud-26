@@ -12,6 +12,7 @@ out/
 
 # VS Code
 .vscode/
+bin/
 
 # macOS
 .DS_Store
@@ -19,3 +20,8 @@ out/
 # Spring Boot
 *.log
 spring-shell.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
