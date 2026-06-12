@@ -1,0 +1,3 @@
+storeId,idempotencyKey,coffeeType,price,currency,loyaltyCardId
+store-test-01,test-order-001,LATTE,4.00,EUR,card-test-1
+store-test-01,test-order-002,AMERICANO,3.00,EUR,card-test-2

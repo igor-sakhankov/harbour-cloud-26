@@ -47,7 +47,9 @@ public class PaymentService {
 				effectiveKey,
 				clock.instant()
 		);
-
+		
+		// Call the fucntion in PaymentRepository which is responsible
+		// for saving the payment in a map
 		Payment stored = repository.saveIfAbsent(candidate);
 		boolean created = stored.paymentId().equals(candidate.paymentId());
 		return new RegistrationResult(stored, created);

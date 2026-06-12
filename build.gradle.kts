@@ -28,3 +28,17 @@ dependencies {
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("propagatePayments") {
+	group = "application"
+	description = "Propagate payments from a CSV file to the Central System API"
+	classpath = sourceSets["main"].runtimeClasspath
+	mainClass.set("space.harbour.cloud.propagation.PaymentPropagationApp")
+	val csvFile = project.findProperty("csvFile")?.toString()
+		?: throw GradleException("Pass -PcsvFile=<path-to-csv>")
+	val cliArgs = mutableListOf(csvFile)
+	if (project.hasProperty("baseUrl")) {
+		cliArgs.add(project.property("baseUrl").toString())
+	}
+	args(cliArgs)
+}
