@@ -1,0 +1,6 @@
+coffee_type,price,currency,loyalty_card_id
+LATTE,3.50,EUR,card-1001
+ESPRESSO,2.00,EUR,card-1002
+DOUBLE_ESPRESSO,2.80,EUR,card-1003
+CAPPUCCINO,3.20,EUR,card-1001
+COLD_BREW,4.10,EUR,card-1004
