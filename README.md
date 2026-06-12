@@ -109,6 +109,82 @@ curl -s -w "\nHTTP %{http_code}\n" -X POST http://localhost:8080/api/v1/payments
   -d '{"coffeeType":"LATTE","price":3.50,"currency":"EUR","loyaltyCardId":"card-999"}'
 ```
 
+## Redirect load balancer
+
+The app also includes a small redirect-based load balancer. Requests sent to
+`/lb/<target-path>` receive `302 Found`; the `Location` header points to a
+healthy backend instance and preserves the original target path and query
+string.
+
+This uses `302` because the homework asks for it. For production write requests,
+`307` or `308` is usually safer because those status codes require clients to
+preserve the original HTTP method and body when following the redirect.
+
+### How to get the list of available services
+
+Backend app instances are configured explicitly:
+
+```properties
+load-balancer.instances=http://localhost:8081,http://localhost:8082
+```
+
+The same value can be supplied as an environment variable:
+
+```bash
+LOAD_BALANCER_INSTANCES=http://localhost:8081,http://localhost:8082 ./gradlew bootRun
+```
+
+The load balancer exposes its configured backends and latest health results at:
+
+```bash
+curl http://localhost:8080/lb/backends
+```
+
+### How health checks work
+
+Every backend is checked periodically with an HTTP `GET` to its health endpoint.
+The default is:
+
+```properties
+load-balancer.health-path=/actuator/health
+load-balancer.health-timeout=1s
+load-balancer.health-check-interval-ms=5000
+```
+
+Any `2xx` response marks the backend healthy. Timeouts, connection failures, and
+non-`2xx` responses mark it unhealthy. If no healthy backend exists, the load
+balancer returns `503 Service Unavailable` instead of redirecting.
+
+### Algorithm
+
+The selection algorithm is round-robin across healthy backends only. Round-robin
+is deterministic, simple to inspect during homework, and spreads requests evenly
+when all app instances have the same capacity.
+
+### Running a local demo
+
+Start two app instances on different ports:
+
+```bash
+SERVER_PORT=8081 SPRING_DOCKER_COMPOSE_ENABLED=false ./gradlew bootRun
+SERVER_PORT=8082 SPRING_DOCKER_COMPOSE_ENABLED=false ./gradlew bootRun
+```
+
+Then start a load-balancer instance:
+
+```bash
+SERVER_PORT=8080 \
+LOAD_BALANCER_INSTANCES=http://localhost:8081,http://localhost:8082 \
+SPRING_DOCKER_COMPOSE_ENABLED=false \
+./gradlew bootRun
+```
+
+Example redirect:
+
+```bash
+curl -i "http://localhost:8080/lb/api/v1/payments?storeId=store-london-01"
+```
+
 ## Injecting network faults via Toxiproxy
 
 Point your client at **port 9091** and use the Toxiproxy management API on **port 8474**.
@@ -138,22 +214,28 @@ harbour-cloud-26/
 │   ├── main/
 │   │   ├── java/space/harbour/cloud/
 │   │   │   ├── CloudApplication.java          # Spring Boot entry point
-│   │   │   └── payments/
-│   │   │       ├── Payment.java               # Domain record
-│   │   │       ├── PaymentRequest.java        # Validated request body
-│   │   │       ├── PaymentResponse.java       # API response shape
-│   │   │       ├── CoffeeType.java            # Enum of coffee varieties
-│   │   │       ├── PaymentController.java     # REST endpoints
-│   │   │       ├── PaymentService.java        # Idempotency logic
-│   │   │       ├── PaymentRepository.java     # In-memory store
-│   │   │       ├── PaymentConfig.java         # Clock bean
-│   │   │       └── PaymentExceptionHandler.java # 400 error shaping
+│   │   │   ├── payments/
+│   │   │   │   ├── Payment.java               # Domain record
+│   │   │   │   ├── PaymentRequest.java        # Validated request body
+│   │   │   │   ├── PaymentResponse.java       # API response shape
+│   │   │   │   ├── CoffeeType.java            # Enum of coffee varieties
+│   │   │   │   ├── PaymentController.java     # REST endpoints
+│   │   │   │   ├── PaymentService.java        # Idempotency logic
+│   │   │   │   ├── PaymentRepository.java     # In-memory store
+│   │   │   │   ├── PaymentConfig.java         # Clock bean
+│   │   │   │   └── PaymentExceptionHandler.java # 400 error shaping
+│   │   │   └── loadbalancer/
+│   │   │       ├── RedirectLoadBalancerController.java # 302 redirect endpoint
+│   │   │       └── RoundRobinRedirectLoadBalancer.java # healthy round-robin selector
 │   │   └── resources/
 │   │       ├── application.properties
 │   │       └── static/index.html             # Transaction viewer UI
 │   └── test/
-│       └── java/space/harbour/cloud/payments/
-│           └── PaymentControllerTest.java
+│       └── java/space/harbour/cloud/
+│           ├── payments/PaymentControllerTest.java
+│           └── loadbalancer/
+│               ├── RedirectLoadBalancerControllerTest.java
+│               └── RoundRobinRedirectLoadBalancerTest.java
 ├── compose.yaml          # Toxiproxy sidecar
 ├── toxiproxy.json        # Proxy config: 9091 → localhost:8080
 ├── build.gradle.kts
