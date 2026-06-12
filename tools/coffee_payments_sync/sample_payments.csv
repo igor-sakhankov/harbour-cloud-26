@@ -1,0 +1,4 @@
+store_id,coffee_type,price,currency,loyalty_card_id,transaction_id
+store-bkk-01,LATTE,3.50,EUR,card-123,notebook-0001
+store-bkk-01,flat white,4.25,EUR,card-456,notebook-0002
+store-bkk-01,COLD_BREW,5.00,EUR,card-789,notebook-0003

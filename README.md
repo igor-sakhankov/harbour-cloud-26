@@ -109,6 +109,18 @@ curl -s -w "\nHTTP %{http_code}\n" -X POST http://localhost:8080/api/v1/payments
   -d '{"coffeeType":"LATTE","price":3.50,"currency":"EUR","loyaltyCardId":"card-999"}'
 ```
 
+## Syncing notebook CSV payments
+
+The `tools/coffee_payments_sync` client sends end-of-day Coffee Place CSV exports
+to this API with retries, stable idempotency keys, and a local sync journal for
+safe reruns.
+
+```bash
+cd tools/coffee_payments_sync
+python3 coffee_payments_sync.py sample_payments.csv --base-url http://localhost:8080
+python3 -m unittest -v
+```
+
 ## Injecting network faults via Toxiproxy
 
 Point your client at **port 9091** and use the Toxiproxy management API on **port 8474**.
@@ -155,6 +167,8 @@ harbour-cloud-26/
 │       └── java/space/harbour/cloud/payments/
 │           └── PaymentControllerTest.java
 ├── compose.yaml          # Toxiproxy sidecar
+├── tools/
+│   └── coffee_payments_sync/ # CSV client for end-of-day payment uploads
 ├── toxiproxy.json        # Proxy config: 9091 → localhost:8080
 ├── build.gradle.kts
 └── settings.gradle.kts
