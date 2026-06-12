@@ -20,3 +20,4 @@ out/
 *.log
 spring-shell.log
 import-journal.txt
+.claude/
