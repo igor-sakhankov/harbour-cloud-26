@@ -139,19 +139,19 @@ public final class PaymentCsvImporter {
 
     private enum Outcome { CREATED, ALREADY_EXISTS, PERMANENT_FAILURE }
 
+    /**
+     * Cap on 302 hops per attempt. The redirect load balancer answers each POST
+     * with a single 302 to a chosen instance, so one hop is the norm; the cap just
+     * stops a misconfigured chain (e.g. an instance redirecting to itself) from looping.
+     */
+    private static final int MAX_REDIRECTS = 5;
+
     private Outcome send(Row row) {
-        HttpRequest request = HttpRequest.newBuilder(
-                        cfg.baseUrl().resolve("/api/v1/payments"))
-                .timeout(cfg.requestTimeout())
-                .header("Content-Type", "application/json")
-                .header("Store-Id", row.storeId())
-                .header("Idempotency-Key", row.idempotencyKey())
-                .POST(HttpRequest.BodyPublishers.ofString(row.toJson()))
-                .build();
+        URI target = cfg.baseUrl().resolve("/api/v1/payments");
 
         for (int attempt = 1; attempt <= cfg.maxAttempts(); attempt++) {
             try {
-                HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString());
+                HttpResponse<String> resp = sendFollowingRedirects(row, target);
                 int code = resp.statusCode();
 
                 if (code == 201) { log(row, "CREATED (201)"); return Outcome.CREATED; }
@@ -179,6 +179,50 @@ public final class PaymentCsvImporter {
             }
         }
         return Outcome.PERMANENT_FAILURE;
+    }
+
+    /**
+     * Issues the POST and follows any 302 (or other 3xx) from the redirect load
+     * balancer manually. Java's {@link HttpClient} will not auto-redirect a POST,
+     * so we re-issue the SAME POST — same body, same {@code Store-Id} and
+     * {@code Idempotency-Key} headers — to the {@code Location} target. Idempotency
+     * makes these redirect-retries duplicate-safe. Bounded by {@link #MAX_REDIRECTS}.
+     *
+     * @return the first non-redirect response, or the last redirect if the cap is hit
+     */
+    private HttpResponse<String> sendFollowingRedirects(Row row, URI uri)
+            throws IOException, InterruptedException {
+        URI current = uri;
+        HttpResponse<String> resp = null;
+        for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
+            resp = http.send(buildRequest(row, current), HttpResponse.BodyHandlers.ofString());
+            if (!isRedirect(resp.statusCode())) return resp;
+
+            Optional<String> location = resp.headers().firstValue("Location");
+            if (location.isEmpty()) {
+                log(row, "redirect " + resp.statusCode() + " without Location header");
+                return resp;
+            }
+            current = current.resolve(location.get()); // resolve() handles absolute and relative
+            log(row, "redirect " + resp.statusCode() + " -> following to " + current
+                    + " (hop " + (hop + 1) + ")");
+        }
+        log(row, "exceeded max redirects (" + MAX_REDIRECTS + "), giving up on chain");
+        return resp; // last 302: not 200/201 and not retryable -> treated as PERMANENT_FAILURE
+    }
+
+    private HttpRequest buildRequest(Row row, URI uri) {
+        return HttpRequest.newBuilder(uri)
+                .timeout(cfg.requestTimeout())
+                .header("Content-Type", "application/json")
+                .header("Store-Id", row.storeId())
+                .header("Idempotency-Key", row.idempotencyKey())
+                .POST(HttpRequest.BodyPublishers.ofString(row.toJson()))
+                .build();
+    }
+
+    private static boolean isRedirect(int code) {
+        return code == 301 || code == 302 || code == 303 || code == 307 || code == 308;
     }
 
     private static boolean isRetryable(int code) {

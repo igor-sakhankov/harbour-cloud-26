@@ -137,7 +137,13 @@ harbour-cloud-26/
 ├── src/
 │   ├── main/
 │   │   ├── java/space/harbour/cloud/
-│   │   │   ├── CloudApplication.java          # Spring Boot entry point
+│   │   │   ├── CloudApplication.java          # Payments entry point (scans payments only)
+│   │   │   ├── lb/                             # Redirect (302) load balancer — a 2nd Spring Boot app
+│   │   │   │   ├── LoadBalancerApplication.java # Entry point (scanBasePackages = ...lb)
+│   │   │   │   ├── LbProperties.java            # lb.* config
+│   │   │   │   ├── InstanceRegistry.java        # health state + round-robin
+│   │   │   │   ├── ActiveHealthChecker.java     # @Scheduled /actuator/health probe
+│   │   │   │   └── RedirectController.java      # /api/** → 302; /lb/report; /lb/status
 │   │   │   └── payments/
 │   │   │       ├── Payment.java               # Domain record
 │   │   │       ├── PaymentRequest.java        # Validated request body
@@ -150,6 +156,7 @@ harbour-cloud-26/
 │   │   │       └── PaymentExceptionHandler.java # 400 error shaping
 │   │   └── resources/
 │   │       ├── application.properties
+│   │       ├── application-lb.properties     # Load balancer profile (port 8090, instances, thresholds)
 │   │       └── static/index.html             # Transaction viewer UI
 │   └── test/
 │       └── java/space/harbour/cloud/payments/
@@ -249,3 +256,76 @@ Automated equivalents of these scenarios run without Docker in
 `PaymentCsvImporterTest` (a self-contained fake server that fails twice then
 succeeds), covering retry-then-create, journal-based skip, and server-side
 idempotent replay.
+
+The importer also **follows 302 redirects manually** — Java's `HttpClient` will
+not auto-redirect a POST, so on a `302 Found` it reads the `Location` header and
+re-issues the *same* POST (same body, same `Store-Id` / `Idempotency-Key`) to the
+target, bounded by a small max-redirect count. This lets it talk to the redirect
+load balancer below; idempotency keeps the redirect-retries duplicate-safe.
+
+
+## Redirect (HTTP 302) load balancer
+
+A **second, standalone Spring Boot app** in this same module
+(`space.harbour.cloud.lb`) that spreads `/api/**` traffic across several payment
+instances. It does **not** proxy: on each `/api/**` request it picks one healthy
+instance and answers `302 Found` with a `Location` header, and the client follows
+the redirect to that instance directly.
+
+| Piece | Responsibility |
+|---|---|
+| `LoadBalancerApplication` | Entry point — `scanBasePackages = "space.harbour.cloud.lb"` (so it never boots the payments controllers), `@EnableScheduling`, `@EnableConfigurationProperties` |
+| `LbProperties` (`lb.*`) | Static instance list, health path, probe interval/timeout, and the two state-machine thresholds |
+| `InstanceRegistry` | Instance list + health state + round-robin `next()` (atomic counter over the *currently healthy* set) + `recordResult(...)` |
+| `ActiveHealthChecker` | `@Scheduled` probe of each instance's `/actuator/health` via `java.net.http.HttpClient` |
+| `RedirectController` | `/api/**` → `302`; `POST /lb/report`; `GET /lb/status` |
+
+**Health model — both active and passive, one state machine.** Active probes
+(scheduled) and passive client reports (`POST /lb/report?instance=...&ok=false`)
+feed the *same* threshold-based machine: an instance is **ejected after
+`unhealthy-after` consecutive failures** and **re-admitted only after
+`healthy-after` consecutive successes**, so it never flaps. Only `/api/**` is
+intercepted, so `favicon.ico`, `/error`, and `/lb/*` are never redirected. The
+302 `Location` preserves the original path **and** query string. When no instance
+is healthy, `/api/**` returns **503**.
+
+Configuration lives in `application-lb.properties` (activated by the `lb` profile):
+`server.port=8090`, `lb.instances=http://localhost:8081,http://localhost:8082`,
+`lb.health-path=/actuator/health`, `lb.interval=2s`, `lb.timeout=1s`,
+`lb.unhealthy-after=2`, `lb.healthy-after=2`.
+
+### Running it
+
+Start **two backend instances** on 8081 / 8082 (the actuator starter exposes
+`/actuator/health`), and the **balancer** on 8090. The easiest way to run more
+than one backend is from the fat jar:
+
+```bash
+# build once
+./gradlew bootJar
+
+# two backend instances (disable docker-compose so they don't fight over Toxiproxy)
+java -jar build/libs/cloud-0.0.1-SNAPSHOT.jar --server.port=8081 --spring.docker.compose.enabled=false
+java -jar build/libs/cloud-0.0.1-SNAPSHOT.jar --server.port=8082 --spring.docker.compose.enabled=false
+
+# the load balancer (separate task; normal `bootRun` only starts the payments app)
+./gradlew bootRunLb
+```
+
+### Verifying it
+
+```bash
+# both instances HEALTHY
+curl -s http://localhost:8090/lb/status
+
+# two /api calls -> 302 with Location alternating between :8081 and :8082
+curl -si "http://localhost:8090/api/v1/payments?storeId=store-1" | grep -i '^\(HTTP\|location:\)'
+curl -si "http://localhost:8090/api/v1/payments?storeId=store-1" | grep -i '^location:'
+
+# kill one instance; within ~2 intervals (~4 s) it is ejected and all traffic
+# goes to the survivor
+curl -s http://localhost:8090/lb/status
+
+# with both down, /api returns 503
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8090/api/v1/payments
+```
