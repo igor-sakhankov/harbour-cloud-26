@@ -162,6 +162,15 @@ harbour-cloud-26/
 
 ---
 
+## Tools
+
+[`tools/coffee-payments-sync/`](tools/coffee-payments-sync/) is a small Python CLI
+for pushing a CSV of a day's sales into the payments API, with retries, idempotency
+keys and a resume ledger so it survives the Toxiproxy faults. See its
+[README](tools/coffee-payments-sync/README.md).
+
+---
+
 ## Course context
 
 This repository is the practical companion to the **Distributed Systems & Cloud** lecture series. The storage layer is intentionally in-memory (a `ConcurrentHashMap`) — later modules swap it for a real database, add messaging via Kafka, and deploy to AWS. Each change targets a single distributed-systems concept so students can study it in isolation.
