@@ -1,0 +1,14 @@
+{
+  "backends": [
+    "http://localhost:8081",
+    "http://localhost:8082",
+    "http://localhost:8083"
+  ],
+  "listen_port": 8080,
+  "health_path": "/api/v1/payments?storeId=__lb_health__",
+  "health_interval": 1.0,
+  "health_timeout": 2.0,
+  "fail_threshold": 2,
+  "rise_threshold": 2,
+  "redirect_status": 302
+}
